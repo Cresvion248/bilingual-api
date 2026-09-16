@@ -37,7 +37,13 @@ export const app = {
       if (error) throw error;
     },
     async loginWithProvider(provider, returnTo = "/") {
-      const redirectTo = `${siteOrigin()}${returnTo.startsWith("/") ? returnTo : "/"}`;
+      const next = returnTo.startsWith("/") ? returnTo : "/";
+      try {
+        sessionStorage.setItem("auth_return_to", next);
+      } catch {
+        /* ignore */
+      }
+      const redirectTo = `${siteOrigin()}/auth/callback`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: { redirectTo }
@@ -65,9 +71,7 @@ export const app = {
       const { error } = await supabase.auth.resend({ type: "signup", email });
       if (error) throw error;
     },
-    setToken() {
-      // Session is persisted by supabase-js.
-    },
+    setToken() {},
     async resetPasswordRequest(email) {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${siteOrigin()}/reset-password`
@@ -109,7 +113,6 @@ export const app = {
   }
 };
 
-// Pages historically imported `{ base44 }` — keep that binding without the SDK.
 export const base44 = app;
 
 export { getSettings, updateAppSetting };
