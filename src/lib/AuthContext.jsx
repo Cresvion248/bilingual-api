@@ -72,18 +72,14 @@ export function AuthProvider({ children }) {
       setAuthError(null);
       return null;
     }
-    const { data, error } = await supabase
+
+    const { data } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", sessionUser.id)
       .maybeSingle();
 
     let row = data;
-    if (error || !row) {
-      await new Promise((r) => setTimeout(r, 400));
-      const retry = await supabase.from("profiles").select("*").eq("id", sessionUser.id).maybeSingle();
-      row = retry.data;
-    }
     if (!row) {
       const insert = {
         id: sessionUser.id,
@@ -101,13 +97,6 @@ export function AuthProvider({ children }) {
       };
       const { data: created } = await supabase.from("profiles").upsert(insert).select().maybeSingle();
       row = created || insert;
-    }
-
-    if (row.account_status === "pending") {
-      setProfile(row);
-      setUser(mergeUser(sessionUser, row));
-      setAuthError({ type: "user_not_registered" });
-      return row;
     }
 
     setProfile(row);
@@ -225,7 +214,7 @@ export function AuthProvider({ children }) {
       session,
       publicSettings,
       appPublicSettings: publicSettings,
-      isAuthenticated: !!(session && user && !authError),
+      isAuthenticated: !!(session && user),
       isLoadingAuth,
       isLoadingPublicSettings,
       authChecked,
