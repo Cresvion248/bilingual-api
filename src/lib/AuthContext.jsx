@@ -78,31 +78,42 @@ export function AuthProvider({ children }) {
       .eq("id", sessionUser.id)
       .maybeSingle();
 
-    if (error) {
-      setProfile(null);
-      setUser(mergeUser(sessionUser, null));
-      setAuthError({ type: "user_not_registered" });
-      return null;
+    let row = data;
+    if (error || !row) {
+      await new Promise((r) => setTimeout(r, 400));
+      const retry = await supabase.from("profiles").select("*").eq("id", sessionUser.id).maybeSingle();
+      row = retry.data;
+    }
+    if (!row) {
+      const insert = {
+        id: sessionUser.id,
+        user_id: sessionUser.id,
+        email: sessionUser.email || "",
+        full_name:
+          sessionUser.user_metadata?.full_name ||
+          sessionUser.user_metadata?.name ||
+          "",
+        display_name: sessionUser.user_metadata?.name || "",
+        preferred_interface_language: "en",
+        timezone: "UTC",
+        role: "user",
+        account_status: "active"
+      };
+      const { data: created } = await supabase.from("profiles").upsert(insert).select().maybeSingle();
+      row = created || insert;
     }
 
-    if (!data) {
-      setProfile(null);
-      setUser(mergeUser(sessionUser, null));
+    if (row.account_status === "pending") {
+      setProfile(row);
+      setUser(mergeUser(sessionUser, row));
       setAuthError({ type: "user_not_registered" });
-      return null;
+      return row;
     }
 
-    if (data.account_status === "pending") {
-      setProfile(data);
-      setUser(mergeUser(sessionUser, data));
-      setAuthError({ type: "user_not_registered" });
-      return data;
-    }
-
-    setProfile(data);
-    setUser(mergeUser(sessionUser, data));
+    setProfile(row);
+    setUser(mergeUser(sessionUser, row));
     setAuthError(null);
-    return data;
+    return row;
   }, []);
 
   const checkUserAuth = useCallback(async () => {
@@ -176,9 +187,7 @@ export function AuthProvider({ children }) {
   const loginWithGoogle = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${siteOrigin()}/`
-      }
+      options: { redirectTo: `${siteOrigin()}/auth/callback` }
     });
     if (error) throw error;
   }, []);

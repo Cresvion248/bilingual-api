@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { base44 } from "@/api/appClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,16 +9,20 @@ import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
 import { useI18n } from "@/i18n";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function Login() {
   const { t } = useI18n();
+  const { isAuthenticated, isLoadingAuth } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  // Post-login destination (e.g. the MCP OAuth consent page sends users here
-  // with returnTo so the grant flow can resume). Same-origin paths only.
   const returnTo = safeReturnTo();
+
+  if (!isLoadingAuth && isAuthenticated) {
+    return <Navigate to={returnTo || "/"} replace />;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,8 +38,15 @@ export default function Login() {
     }
   };
 
-  const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", returnTo);
+  const handleGoogle = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      await base44.auth.loginWithProvider("google", returnTo);
+    } catch (err) {
+      setError(err.message || t("auth.loginFailed"));
+      setLoading(false);
+    }
   };
 
   return (
