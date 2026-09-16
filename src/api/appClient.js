@@ -5,6 +5,7 @@ import { usageSummary, purgeUsageRecords } from "@/api/usage";
 import { adminOverview, providerStatus as adminProviderStatus } from "@/api/admin";
 import { stt, tts, pipeline, uploadSpeechFile, providerStatus } from "@/api/speech";
 import { getSettings, updateAppSetting } from "@/api/settings";
+import { listAnnouncements } from "@/api/announcements";
 
 function siteOrigin() {
   if (typeof window === "undefined") return "http://localhost:5173";
@@ -15,15 +16,48 @@ function wrapData(payload) {
   return { data: payload };
 }
 
+async function safeProviderStatus() {
+  try {
+    return await providerStatus();
+  } catch {
+    try {
+      return await adminProviderStatus();
+    } catch {
+      return { stt_configured: false, tts_configured: false };
+    }
+  }
+}
+
+async function safeUsageSummary(payload) {
+  try {
+    return await usageSummary(payload || {});
+  } catch {
+    return {
+      today: { stt_seconds: 0, tts_characters: 0, successes: 0 },
+      limits: {
+        daily_stt_seconds: 300,
+        daily_tts_characters: 10000,
+        daily_requests: 20
+      },
+      remaining: {
+        daily_stt_seconds: 300,
+        daily_tts_characters: 10000,
+        daily_requests: 20
+      },
+      recent: []
+    };
+  }
+}
+
 const functionHandlers = {
   updateProfile: (payload) => updateProfile(payload || {}),
   listApiKeys: (payload) => listApiKeys(payload || {}),
   createApiKey: (payload) => createApiKey(payload || {}),
   revokeApiKey: (payload) => revokeApiKey(payload || {}),
-  usageSummary: (payload) => usageSummary(payload || {}),
+  usageSummary: (payload) => safeUsageSummary(payload),
   purgeUsageRecords: () => purgeUsageRecords(),
   adminOverview: () => adminOverview(),
-  providerStatus: () => providerStatus().catch(() => adminProviderStatus()),
+  providerStatus: () => safeProviderStatus(),
   stt: (payload) => stt(payload || {}),
   tts: (payload) => tts(payload || {}),
   pipeline: (payload) => pipeline(payload || {}),
@@ -99,6 +133,11 @@ export const app = {
       }
       const data = await handler(payload);
       return wrapData(data);
+    }
+  },
+  entities: {
+    SystemAnnouncement: {
+      list: () => listAnnouncements({ activeOnly: false }).catch(() => [])
     }
   },
   integrations: {
