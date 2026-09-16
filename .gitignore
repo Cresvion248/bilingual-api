@@ -1,0 +1,22 @@
+# env
+.env
+.env.*
+!.env.example
+
+# logs
+/logs
+*.log
+npm-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+.output
+.wrangler
+.vite
+
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
